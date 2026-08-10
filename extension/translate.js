@@ -116,7 +116,6 @@ const selectionPrompt = (text, mode) => {
 2. **Detect the source language yourself.** If the input is Arabizi (Arabic written in Latin letters with numbers), read '3' → 'ع', '7' → 'ح', '8' → 'غ', '9' → 'ق', '5' → 'خ', '2' → 'ء' **to understand it**. This mapping only helps you read the input — it must never change the language or script you output.
 3. **Preserve meaning, tone, and formatting** (line breaks, lists, punctuation).
 4. If the input is already in ${target}, return it unchanged.
-5. Whatever the input language, the answer must be ${target} and nothing else.
 
 ### **Input Text:**
 """
