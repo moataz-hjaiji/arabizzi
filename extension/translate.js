@@ -98,25 +98,17 @@ const frenchPrompt = (text) => `Translate the following Tunisian Arabic text (wr
 
 // The popup prompts above assume Arabizi input. Text selected on a web page can
 // be in any language, so page selections use this auto-detecting variant.
-const SELECTION_TARGET = {
-  fusha: "formal Modern Standard Arabic (Fusha)",
-  tunisian: "Tunisian colloquial Arabic",
-  english: "natural, fluent English",
-  french: "natural, fluent French",
-};
-
-// Stated separately from the language so the Arabizi mapping in rule 2 can
+// script is stated separately from lang so the Arabizi mapping in rule 2 can
 // never be read as "answer in Arabic script" for an English/French target.
-const SELECTION_SCRIPT = {
-  fusha: "Arabic script",
-  tunisian: "Arabic script",
-  english: "the Latin alphabet, in the English language",
-  french: "the Latin alphabet, in the French language",
+const SELECTION_TARGET = {
+  fusha: { lang: "formal Modern Standard Arabic (Fusha)", script: "Arabic script" },
+  tunisian: { lang: "Tunisian colloquial Arabic", script: "Arabic script" },
+  english: { lang: "natural, fluent English", script: "the Latin alphabet, in the English language" },
+  french: { lang: "natural, fluent French", script: "the Latin alphabet, in the French language" },
 };
 
 const selectionPrompt = (text, mode) => {
-  const target = SELECTION_TARGET[mode] || SELECTION_TARGET.fusha;
-  const script = SELECTION_SCRIPT[mode] || SELECTION_SCRIPT.fusha;
+  const { lang: target, script } = SELECTION_TARGET[mode] || SELECTION_TARGET.fusha;
   return `You are a translation engine. Translate the input text into ${target}.
 
 ### **Rules:**

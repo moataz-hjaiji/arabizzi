@@ -54,9 +54,8 @@ function buildMenus() {
 }
 
 chrome.runtime.onInstalled.addListener(buildMenus);
-chrome.runtime.onStartup.addListener(buildMenus);
-// onInstalled fires once and is easy to miss (worker crash, install race), so
-// rebuild whenever the worker starts. Menus are keyed by id, removeAll first.
+// Runs on every worker start, so a missed onInstalled (crash, install race)
+// still ends up with menus.
 buildMenus();
 
 chrome.storage.onChanged.addListener((changes, area) => {

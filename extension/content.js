@@ -14,7 +14,6 @@
       loading: "Translating…",
       copy: "Copy",
       copied: "Copied!",
-      close: "Close",
       keyMissing: "Add your free Gemini API key in the Arabizzi popup (⚙) to start translating.",
       error: "Translation failed. Please try again.",
       fusha: "Fusha",
@@ -28,7 +27,6 @@
       loading: "جاري الترجمة…",
       copy: "نسخ",
       copied: "تم النسخ!",
-      close: "إغلاق",
       keyMissing: "أضف مفتاح Gemini المجاني من نافذة Arabizzi (⚙) لبدء الترجمة.",
       error: "فشلت الترجمة. يرجى المحاولة مرة أخرى.",
       fusha: "فصحى",
@@ -54,6 +52,7 @@
       box-shadow: 0 8px 28px rgba(29, 35, 41, 0.18);
       overflow: hidden;
     }
+    .panel.bare { border: none; background: transparent; box-shadow: none; }
     .pill {
       display: flex;
       align-items: center;
@@ -117,7 +116,6 @@
 
   let host = null;
   let shadow = null;
-  let lastSelection = null; // { text, rect }
   let lang = "ar";
 
   chrome.storage.local.get("language", (stored) => {
@@ -174,19 +172,14 @@
     build(panel);
     shadow.appendChild(panel);
     place(panel, rect);
-    return panel;
   }
 
   function showPill(text, rect) {
-    lastSelection = { text, rect };
     render(rect, (panel) => {
-      panel.style.border = "none";
-      panel.style.background = "transparent";
-      panel.style.boxShadow = "none";
+      panel.classList.add("bare");
       const btn = document.createElement("button");
       btn.className = "pill";
-      btn.innerHTML = `<span class="glyph">ع</span><span></span>`;
-      btn.lastElementChild.textContent = t().translate;
+      btn.innerHTML = `<span class="glyph">ع</span><span>${t().translate}</span>`;
       btn.addEventListener("click", () => translate(text, null, rect));
       panel.appendChild(btn);
     });
@@ -198,11 +191,7 @@
       box.className = "skeleton";
       box.setAttribute("role", "status");
       box.setAttribute("aria-label", t().loading);
-      for (let i = 0; i < 3; i++) {
-        const line = document.createElement("div");
-        line.className = "sk-line";
-        box.appendChild(line);
-      }
+      box.innerHTML = '<div class="sk-line"></div>'.repeat(3);
       panel.appendChild(box);
     });
   }
@@ -248,7 +237,6 @@
   }
 
   function translate(text, mode, rect) {
-    lastSelection = { text, rect };
     showLoading(rect);
     chrome.runtime.sendMessage({ action: "translate", text, mode }, (res) => {
       if (chrome.runtime.lastError || !res) {
@@ -314,12 +302,11 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.action !== "translate-selection") return;
     const current = selectionRect();
-    const rect = current?.rect ||
-      lastSelection?.rect || {
-        top: 80,
-        bottom: 80,
-        left: window.innerWidth / 2 - 180,
-      };
+    const rect = current?.rect || {
+      top: 80,
+      bottom: 80,
+      left: window.innerWidth / 2 - 180,
+    };
     const text = msg.text?.trim() || current?.text || "";
     if (text) translate(text, msg.mode, rect);
   });

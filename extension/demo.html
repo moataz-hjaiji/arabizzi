@@ -52,7 +52,6 @@
       }
       iframe { width: 100%; height: 110px; border: 1px solid var(--border); border-radius: 8px; }
       [dir="rtl"] { text-align: right; }
-      ol { margin: 0; padding-inline-start: 20px; color: var(--muted); font-size: 14px; }
     </style>
   </head>
   <body>
@@ -101,17 +100,6 @@
         <iframe src="demo-frame.html" title="nested frame"></iframe>
       </section>
 
-      <section>
-        <h2>Checklist</h2>
-        <ol>
-          <li>Pill appears on selection, in every block above</li>
-          <li>Clicking it shows a translation, RTL for Arabic targets</li>
-          <li>Each chip (Fusha / عامية / English / French) changes the output language</li>
-          <li>Right-click → Translate with Arabizzi → each mode works</li>
-          <li>Scroll or press Escape — the bubble disappears</li>
-          <li>Open the popup: the selections show up under Recent</li>
-        </ol>
-      </section>
     </main>
     <script>
       // Mimics sites that stop mouse events from reaching document listeners.
