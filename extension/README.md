@@ -62,7 +62,7 @@ pnpm extension:preview
 
 | Page | URL | What it shows |
 |------|-----|----------------|
-| **User preview** | http://localhost:5173/preview-user.html | v1.3.0 after setup — API key hidden, sample conversion, popup over a page |
+| **User preview** | http://localhost:5173/preview-user.html | v1.4.0 after setup — API key hidden, sample conversion, popup over a page |
 | Developer preview | http://localhost:5173/preview.html | First-run flow (API key panel opens automatically) |
 | Raw popup | http://localhost:5173/popup.html | Exact extension markup without mocks |
 
@@ -102,8 +102,11 @@ The demo page ends with a checklist covering both entry points. Run
 | Symptom | Where to look |
 |---|---|
 | No pill on selection | Did you reload *both* the extension and the page? |
+| No pill on keyboard select | Shift+arrows / Ctrl/Cmd+A should show the pill after keyup |
+| No pill in a textarea | Needs `content.js` that reads `selectionStart`/`selectionEnd` |
 | No pill, correct reloads | Page console — `content.js` errors surface there |
 | Pill works, nothing after clicking | Extension card → **service worker** → Console |
+| Bubble jumps back to the pill | Fixed by keeping loading/result for the same selection |
 | Empty or wrong-language result | `selectionPrompt` in `translate.js` |
 
 ## Package for the Chrome Web Store
@@ -128,7 +131,7 @@ Upload `arabizzi-extension.zip` at the [Chrome Web Store Developer Dashboard](ht
 ## How it works
 
 - Calls `https://generativelanguage.googleapis.com` directly (declared in `host_permissions`)
-- Uses the `gemini-2.5-flash` model
+- Uses `gemini-3.1-flash-lite` (falls back to newer/older Flash models if needed)
 - Usage counts against the user's own Gemini free tier
 - No data is sent anywhere except Google's Gemini API
 
