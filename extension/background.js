@@ -2,6 +2,8 @@
 
 importScripts("translate.js");
 
+console.log(`[Arabizzi] service worker ready — models=${MODELS.join(",")}`);
+
 const MENU_ROOT = "arabizzi-root";
 const MENU_PREFIX = "arabizzi:";
 
@@ -27,29 +29,33 @@ async function currentLanguage() {
   return stored[STORAGE.language] === "en" ? "en" : "ar";
 }
 
-// onInstalled, onStartup and the top-level call can all fire in one worker
-// start. Without this chain they interleave between removeAll() and create(),
+// onInstalled and the top-level call can both fire in one worker start.
+// Without this chain they interleave between removeAll() and create(),
 // and the second batch dies with "duplicate id".
 let menuQueue = Promise.resolve();
 
 function buildMenus() {
-  menuQueue = menuQueue.then(async () => {
-    const labels = MENU_I18N[await currentLanguage()];
-    await chrome.contextMenus.removeAll();
-    chrome.contextMenus.create({
-      id: MENU_ROOT,
-      title: labels.root,
-      contexts: ["selection"],
-    });
-    OUTPUT_MODES.forEach((mode) => {
+  menuQueue = menuQueue
+    .then(async () => {
+      const labels = MENU_I18N[await currentLanguage()];
+      await chrome.contextMenus.removeAll();
       chrome.contextMenus.create({
-        id: MENU_PREFIX + mode,
-        parentId: MENU_ROOT,
-        title: labels[mode],
+        id: MENU_ROOT,
+        title: labels.root,
         contexts: ["selection"],
       });
+      OUTPUT_MODES.forEach((mode) => {
+        chrome.contextMenus.create({
+          id: MENU_PREFIX + mode,
+          parentId: MENU_ROOT,
+          title: labels[mode],
+          contexts: ["selection"],
+        });
+      });
+    })
+    .catch(() => {
+      // Keep the queue alive if Chrome rejects a create (e.g. restricted page).
     });
-  });
   return menuQueue;
 }
 
@@ -89,7 +95,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
 async function translateSelection({ text, mode }) {
   const input = (text || "").trim().slice(0, MAX_SELECTION_CHARS);
-  if (!input) return { error: "" };
+  if (!input) return { error: "Empty selection" };
 
   const stored = await chrome.storage.local.get([
     STORAGE.apiKey,
@@ -102,9 +108,8 @@ async function translateSelection({ text, mode }) {
   const apiKey = stored[STORAGE.apiKey];
   if (!apiKey) return { needsKey: true, language: stored[STORAGE.language] };
 
-  const useMode = OUTPUT_MODES.includes(mode)
-    ? mode
-    : normalizeOutputMode(stored);
+  const explicitMode = OUTPUT_MODES.includes(mode);
+  const useMode = explicitMode ? mode : normalizeOutputMode(stored);
 
   const output = await callGemini(selectionPrompt(input, useMode), apiKey);
 
@@ -115,9 +120,14 @@ async function translateSelection({ text, mode }) {
     type: useMode,
     timestamp: Date.now(),
   };
-  await chrome.storage.local.set({
+
+  const toStore = {
     [STORAGE.history]: pruneHistory([entry, ...(stored[STORAGE.history] || [])]),
-  });
+  };
+  // Remember chip / context-menu choice so the next pill click reuses it.
+  if (explicitMode) toStore[STORAGE.outputMode] = useMode;
+
+  await chrome.storage.local.set(toStore);
 
   return { output, mode: useMode, dir: outputDir(useMode) };
 }
@@ -126,6 +136,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.action !== "translate") return;
   translateSelection(msg)
     .then(sendResponse)
-    .catch((err) => sendResponse({ error: err?.message || "" }));
+    .catch((err) => sendResponse({ error: err?.message || "Translation failed" }));
   return true;
 });
