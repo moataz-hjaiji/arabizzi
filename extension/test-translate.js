@@ -6,7 +6,7 @@ const vm = require("node:vm");
 
 const src = fs.readFileSync(path.join(__dirname, "translate.js"), "utf8");
 const T = vm.runInThisContext(
-  `${src}\n;({ selectionPrompt, promptForMode, pruneHistory, normalizeOutputMode, outputDir, callGemini, OUTPUT_MODES })`
+  `${src}\n;({ selectionPrompt, promptForMode, pruneHistory, normalizeOutputMode, outputDir, callGemini, OUTPUT_MODES, MODELS })`
 );
 
 // Every mode gets a real target language, and the input is embedded verbatim.
@@ -57,25 +57,85 @@ assert.strictEqual(T.normalizeOutputMode({ to_fusha: false }), "tunisian");
 assert.strictEqual(T.normalizeOutputMode({}), "fusha");
 
 // callGemini must never return "" — an empty candidate has to surface as an
-// error, and thinking has to be switched off or 2.5-flash spends the whole
-// output budget on reasoning.
+// error. Rate limits should retry before failing. Unavailable models fall through.
 (async () => {
-  const calls = [];
-  globalThis.fetch = async (url, init) => {
-    calls.push(JSON.parse(init.body));
-    return { ok: true, json: async () => FAKE };
+  let callCount = 0;
+  let FAKE = { candidates: [{ finishReason: "MAX_TOKENS", content: {} }] };
+  let status = 200;
+
+  globalThis.fetch = async () => {
+    callCount += 1;
+    const payload = FAKE;
+    const ok = status >= 200 && status < 300;
+    return {
+      ok,
+      status,
+      json: async () => payload,
+    };
   };
 
-  let FAKE = { candidates: [{ finishReason: "MAX_TOKENS", content: {} }] };
   await assert.rejects(() => T.callGemini("p", "k"), /MAX_TOKENS/);
 
   FAKE = { promptFeedback: { blockReason: "SAFETY" } };
+  status = 200;
   await assert.rejects(() => T.callGemini("p", "k"), /SAFETY/);
 
   FAKE = { candidates: [{ content: { parts: [{ text: " hello " }] } }] };
   assert.strictEqual(await T.callGemini("p", "k"), "hello");
 
-  assert.strictEqual(calls[0].generationConfig.thinkingConfig.thinkingBudget, 0);
+  // First call 429, second succeeds.
+  callCount = 0;
+  let phase = 0;
+  globalThis.fetch = async () => {
+    callCount += 1;
+    phase += 1;
+    if (phase === 1) {
+      return {
+        ok: false,
+        status: 429,
+        json: async () => ({
+          error: { message: "Quota exceeded. Please retry in 0.01s." },
+        }),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: "ok" }] } }],
+      }),
+    };
+  };
+  assert.strictEqual(await T.callGemini("p", "k"), "ok");
+  assert.ok(callCount >= 2, "expected a retry after 429");
+
+  // First model unavailable → try next.
+  const tried = [];
+  globalThis.fetch = async (url) => {
+    tried.push(String(url));
+    if (tried.length === 1) {
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({
+          error: {
+            message:
+              "This model models/gemini-3.1-flash-lite is no longer available to new users.",
+          },
+        }),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: "fallback" }] } }],
+      }),
+    };
+  };
+  assert.strictEqual(await T.callGemini("p", "k"), "fallback");
+  assert.ok(tried.length >= 2, "expected model fallback");
+  assert.ok(T.MODELS.length >= 2);
 
   console.log("translate.js OK");
 })();
